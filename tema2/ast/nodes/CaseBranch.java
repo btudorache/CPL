@@ -5,22 +5,18 @@ import cool.semantics.structures.Scope;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 
-public class New extends Expression {
+import java.util.Scanner;
+
+public class CaseBranch extends ASTNode {
+    public Token name;
     public Token type;
-
-    protected Scope scope;
-
-    public New(Token type, ParserRuleContext context) {
+    public Expression value;
+    public Scope scope;
+    public CaseBranch(Token name, Token type, Expression value, ParserRuleContext context) {
         super(context);
+        this.name = name;
         this.type = type;
-    }
-
-    public Scope getScope() {
-        return scope;
-    }
-
-    public void setScope(Scope scope) {
-        this.scope = scope;
+        this.value = value;
     }
 
     @Override

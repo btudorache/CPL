@@ -8,18 +8,10 @@ import org.antlr.v4.runtime.Token;
 public class Id extends Expression {
     public Token name;
 
-    protected Scope scope;
+    public Scope scope;
     public Id(Token name, ParserRuleContext context) {
         super(context);
         this.name = name;
-    }
-
-    public Scope getScope() {
-        return scope;
-    }
-
-    public void setScope(Scope scope) {
-        this.scope = scope;
     }
 
     @Override

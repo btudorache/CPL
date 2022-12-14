@@ -1,19 +1,17 @@
 package cool.semantics;
 
 import cool.ast.ASTVisitor;
-import cool.ast.nodes.*;
 import cool.ast.nodes.Class;
+import cool.ast.nodes.*;
 import cool.semantics.structures.*;
-
-import static cool.semantics.structures.TypeSymbol.SELF_TYPE;
-import static cool.semantics.structures.TypeSymbol.illegatInheritableTypes;
 
 public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     Scope currentScope = null;
+    GlobalScope globalScope = null;
 
     @Override
     public Void visit(Id id) {
-        id.setScope(currentScope);
+        id.scope = currentScope;
         return null;
     }
 
@@ -30,8 +28,9 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
         }
 
         var symbol = new IdSymbol(param.name.getText());
-        param.setScope((FunctionSymbol) currentScope);
-        param.setSymbol(symbol);
+        param.globalScope = globalScope;
+        param.scope = (FunctionSymbol) currentScope;
+        param.symbol = symbol;
 
         if (!currentScope.add(symbol)) {
             SymbolTable.error(param.context,
@@ -55,26 +54,32 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
+        var definedParamType = globalScope.lookupType(param.type.getText());
+        if (definedParamType != null) {
+            param.symbol.type = definedParamType;
+        }
+
         return null;
     }
 
     @Override
     public Void visit(Program program) {
         currentScope = SymbolTable.globals;
+        globalScope = SymbolTable.globals;
         program.classes.forEach(classNode -> classNode.accept(this));
 
         program.classes.forEach(classNode -> {
-            if (classNode.getScope() != null && classNode.inherits != null) {
+            if (classNode.scope != null && classNode.inherits != null) {
                 var inheritedClassScope = currentScope.lookup(classNode.inherits.getText());
                 if (inheritedClassScope instanceof ClassSymbol) {
-                    classNode.getScope().setInheritedScope((ClassSymbol) inheritedClassScope);
+                    classNode.scope.setInheritedScope((ClassSymbol) inheritedClassScope);
                 } else if (!classNode.hasSemanticError()) {
                     SymbolTable.error(classNode.context, classNode.inherits, String.format("Class %s has undefined parent %s", classNode.name.getText(), classNode.inherits.getText()), classNode);
                 }
-            } else if (classNode.getScope() != null) {
+            } else if (classNode.scope != null) {
                 var objectScope = currentScope.lookup("Object");
                 if (objectScope instanceof ClassSymbol) {
-                    classNode.getScope().setInheritedScope((ClassSymbol) objectScope);
+                    classNode.scope.setInheritedScope((ClassSymbol) objectScope);
                 }
             }
         });
@@ -84,13 +89,13 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     @Override
     public Void visit(Class myClass) {
         var className = myClass.name.getText();
-        if (className.equals(SELF_TYPE.getName())) {
+        if (className.equals(ClassSymbol.SELF_TYPE.getName())) {
             SymbolTable.error(myClass.context, myClass.name, "Class has illegal name SELF_TYPE", myClass);
             return null;
         }
 
         var classSymbol = new ClassSymbol(currentScope, className);
-        myClass.setScope(classSymbol);
+        myClass.scope = classSymbol;
         currentScope = classSymbol;
 
         if (!currentScope.getParent().add(classSymbol)) {
@@ -101,7 +106,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
 
         if (myClass.inherits != null) {
             var inheritedClassName = myClass.inherits.getText();
-            if (illegatInheritableTypes.contains(inheritedClassName)) {
+            if (ClassSymbol.illegalInheritableTypes.contains(inheritedClassName)) {
                 SymbolTable.error(myClass.context, myClass.inherits, String.format("Class %s has illegal parent %s", className, inheritedClassName), myClass);
                 currentScope = currentScope.getParent();
                 return null;
@@ -117,28 +122,34 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     }
 
     @Override
-    public Void visit(VariableDefinition variabileDefinition) {
-        if (variabileDefinition.name.getText().equals("self")) {
-            SymbolTable.error(variabileDefinition.context,
-                              variabileDefinition.name,
+    public Void visit(VariableDefinition variableDefinition) {
+        if (variableDefinition.name.getText().equals("self")) {
+            SymbolTable.error(variableDefinition.context,
+                              variableDefinition.name,
                               String.format("Class %s has attribute with illegal name self", ((ClassSymbol)currentScope).getName()),
-                              variabileDefinition);
+                              variableDefinition);
             return null;
         }
 
-        var symbol = new IdSymbol(variabileDefinition.name.getText());
-        variabileDefinition.setScope((ClassSymbol)currentScope);
-        variabileDefinition.setSymbol(symbol);
+        var symbol = new IdSymbol(variableDefinition.name.getText());
+        variableDefinition.scope = (ClassSymbol) currentScope;
+        variableDefinition.globalScope = globalScope;
+        variableDefinition.symbol = symbol;
 
         if (!currentScope.add(symbol)) {
-            SymbolTable.error(variabileDefinition.context,
-                    variabileDefinition.name,
-                    String.format("Class %s redefines attribute %s", ((ClassSymbol)currentScope).getName(), variabileDefinition.name.getText()), variabileDefinition);
+            SymbolTable.error(variableDefinition.context,
+                    variableDefinition.name,
+                    String.format("Class %s redefines attribute %s", ((ClassSymbol)currentScope).getName(), variableDefinition.name.getText()), variableDefinition);
             return null;
         }
 
-        if (variabileDefinition.variableValue != null) {
-            variabileDefinition.variableValue.accept(this);
+        if (variableDefinition.variableValue != null) {
+            variableDefinition.variableValue.accept(this);
+        }
+
+        var definedParamType = globalScope.lookupType(variableDefinition.type.getText());
+        if (definedParamType != null) {
+            variableDefinition.symbol.type = definedParamType;
         }
 
         return null;
@@ -148,7 +159,8 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     public Void visit(FunctionDefinition functionDefinition) {
 
         var functionSymbol = new FunctionSymbol((ClassSymbol) currentScope, functionDefinition.name.getText());
-        functionDefinition.setScope(functionSymbol);
+        functionDefinition.scope = functionSymbol;
+        functionDefinition.globalScope = globalScope;
         currentScope = functionSymbol;
 
         var classScope = (ClassSymbol) currentScope.getParent();
@@ -170,6 +182,11 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
 
         if (functionDefinition.functionValue != null) {
             functionDefinition.functionValue.accept(this);
+        }
+
+        var definedParamType = globalScope.lookupType(functionDefinition.type.getText());
+        if (definedParamType != null) {
+            functionSymbol.type = definedParamType;
         }
 
         currentScope = currentScope.getParent();
@@ -206,7 +223,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
 
     @Override
     public Void visit(New newNode) {
-        newNode.setScope(currentScope);
+        newNode.scope = currentScope;
         return null;
     }
 
@@ -217,24 +234,37 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
-        assign.setScope(currentScope);
+        assign.scope = currentScope;
         assign.expr.accept(this);
         return null;
     }
 
     @Override
     public Void visit(InitCall initCall) {
+        initCall.scope = currentScope;
+        initCall.globalScope = globalScope;
+
+        if (initCall.args != null) {
+            initCall.args.forEach(arg -> arg.accept(this));
+        }
         return null;
     }
 
     @Override
     public Void visit(Call call) {
+        call.scope = currentScope;
+        call.globalScope = globalScope;
+
+        call.prefix.accept(this);
+        if (call.args != null) {
+            call.args.forEach(arg -> arg.accept(this));
+        }
         return null;
     }
 
     @Override
     public Void visit(If ifNode) {
-        ifNode.setScope(currentScope);
+        ifNode.scope = currentScope;
 
         ifNode.cond.accept(this);
         ifNode.thenBranch.accept(this);
@@ -244,7 +274,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
 
     @Override
     public Void visit(While whileNode) {
-        whileNode.setScope(currentScope);
+        whileNode.scope = currentScope;
         whileNode.cond.accept(this);
         whileNode.action.accept(this);
         return null;
@@ -260,15 +290,17 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
-        var idSymbol = new IdSymbol(localParam.name.getText());
-        localParam.setSymbol(idSymbol);
-//        currentScope = new DefaultScope(currentScope);
-//        localParam.setScope(currentScope);
+        localParam.symbol = new IdSymbol(localParam.name.getText());
+        localParam.globalScope = globalScope;
 
         if (localParam.value != null) {
             localParam.value.accept(this);
         }
-//        currentScope.add(idSymbol);
+
+        var definedParamType = globalScope.lookupType(localParam.type.getText());
+        if (definedParamType != null) {
+            localParam.symbol.type = definedParamType;
+        }
 
         return null;
     }
@@ -277,22 +309,22 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     public Void visit(Let let) {
         // current let branch does not have own definition in his scope, so we have to do this
         var prevParam = let.params.get(0);
-        prevParam.setScope(currentScope);
+        prevParam.scope = currentScope;
         prevParam.accept(this);
         for (int i = 1; i < let.params.size(); i++) {
             currentScope = new DefaultScope(currentScope);
-            if (prevParam.getSymbol() != null) {
-                currentScope.add(prevParam.getSymbol());
+            if (prevParam.symbol != null) {
+                currentScope.add(prevParam.symbol);
             }
 
             var currParam = let.params.get(i);
-            currParam.setScope(currentScope);
+            currParam.scope = currentScope;
             currParam.accept(this);
             prevParam = currParam;
         }
 
         currentScope = new DefaultScope(currentScope);
-        currentScope.add(prevParam.getSymbol());
+        currentScope.add(prevParam.symbol);
 
         let.action.accept(this);;
 
@@ -313,7 +345,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             SymbolTable.error(caseBranch.context, caseBranch.type, String.format("Case variable %s has illegal type SELF_TYPE", caseBranch.name.getText()), caseBranch);
         }
 
-        caseBranch.setScope(currentScope);
+        caseBranch.scope = currentScope;
         caseBranch.value.accept(this);
         return null;
     }

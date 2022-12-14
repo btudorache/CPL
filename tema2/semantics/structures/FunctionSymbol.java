@@ -13,15 +13,13 @@ public class FunctionSymbol extends IdSymbol implements Scope {
         this.parent = parent;
     }
 
-    public FunctionSymbol(ClassSymbol parent, String name, TypeSymbol typeSymbol) {
-        super(name, typeSymbol);
+    public FunctionSymbol(ClassSymbol parent, String name, ClassSymbol classSymbol) {
+        super(name, classSymbol);
         this.parent = parent;
     }
 
     @Override
     public boolean add(Symbol sym) {
-        // Ne asigurăm că simbolul nu există deja în domeniul de vizibilitate
-        // curent.
         if (symbols.containsKey(sym.getName()))
             return false;
 
@@ -37,8 +35,6 @@ public class FunctionSymbol extends IdSymbol implements Scope {
         if (sym != null)
             return sym;
 
-        // Dacă nu găsim simbolul în domeniul de vizibilitate curent, îl căutăm
-        // în domeniul de deasupra.
         if (parent != null)
             return parent.lookup(s);
 

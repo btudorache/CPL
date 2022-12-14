@@ -12,20 +12,13 @@ public class Class extends ASTNode {
     public Token name;
     public Token inherits;
     public List<Feature> features;
-    private ClassSymbol scope = null;
+    public ClassSymbol scope = null;
 
     public Class(Token name, Token inherits, List<Feature> features, ParserRuleContext context) {
         super(context);
         this.features = features;
         this.inherits = inherits;
         this.name = name;
-    }
-    public ClassSymbol getScope() {
-        return scope;
-    }
-
-    public void setScope(ClassSymbol scope) {
-        this.scope = scope;
     }
 
     @Override

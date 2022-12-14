@@ -8,8 +8,6 @@ public class BinaryOperator extends Expression {
     public Expression left;
     public Expression right;
     public Token operator;
-
-    private boolean hasDefinitionError = false;
     public BinaryOperator(Expression left, Expression right, Token operator, ParserRuleContext context) {
         super(context);
         this.left = left;

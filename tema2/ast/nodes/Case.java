@@ -9,7 +9,6 @@ public class Case extends Expression {
     public Expression caseExpr;
     public List<CaseBranch> caseBranches;
 
-
     public Case(Expression caseExpr, List<CaseBranch> caseBranches, ParserRuleContext context) {
         super(context);
         this.caseExpr = caseExpr;

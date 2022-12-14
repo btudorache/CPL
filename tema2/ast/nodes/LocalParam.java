@@ -1,6 +1,7 @@
 package cool.ast.nodes;
 
 import cool.ast.ASTVisitor;
+import cool.semantics.structures.GlobalScope;
 import cool.semantics.structures.IdSymbol;
 import cool.semantics.structures.Scope;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -11,30 +12,16 @@ public class LocalParam extends ASTNode {
     public Token type;
     public Expression value;
 
-    protected Scope scope;
+    public Scope scope = null;
 
-    protected IdSymbol symbol;
+    public GlobalScope globalScope = null;
+
+    public IdSymbol symbol = null;
     public LocalParam(Token name, Token type, Expression value, ParserRuleContext context) {
         super(context);
         this.name = name;
         this.type = type;
         this.value = value;
-    }
-
-    public IdSymbol getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(IdSymbol symbol) {
-        this.symbol = symbol;
-    }
-
-    public Scope getScope() {
-        return scope;
-    }
-
-    public void setScope(Scope scope) {
-        this.scope = scope;
     }
 
     @Override

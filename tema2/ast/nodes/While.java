@@ -8,20 +8,12 @@ public class While extends Expression {
     public Expression cond;
     public Expression action;
 
-    protected Scope scope;
+    public Scope scope = null;
 
     public While(Expression cond, Expression action, ParserRuleContext context) {
         super(context);
         this.cond = cond;
         this.action = action;
-    }
-
-    public Scope getScope() {
-        return scope;
-    }
-
-    public void setScope(Scope scope) {
-        this.scope = scope;
     }
 
     @Override

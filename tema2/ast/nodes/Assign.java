@@ -1,19 +1,20 @@
 package cool.ast.nodes;
 
 import cool.ast.ASTVisitor;
+import cool.semantics.structures.Scope;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 
-import java.util.List;
-
-public class InitCall extends Expression {
+public class Assign extends Expression {
     public Token name;
-    public List<Expression> args;
+    public Expression expr;
 
-    public InitCall(Token name, List<Expression> args, ParserRuleContext context) {
+    public Scope scope;
+
+    public Assign(Token name, Expression expr, ParserRuleContext context) {
         super(context);
         this.name = name;
-        this.args = args;
+        this.expr = expr;
     }
 
     @Override

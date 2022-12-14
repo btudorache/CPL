@@ -9,21 +9,13 @@ public class If extends Expression {
     public Expression thenBranch;
     public Expression elseBranch;
 
-    protected Scope scope;
+    public Scope scope;
 
     public If(Expression cond, Expression thenBranch, Expression elseBranch, ParserRuleContext context) {
         super(context);
         this.cond = cond;
         this.thenBranch = thenBranch;
         this.elseBranch = elseBranch;
-    }
-
-    public Scope getScope() {
-        return scope;
-    }
-
-    public void setScope(Scope scope) {
-        this.scope = scope;
     }
 
     @Override
