@@ -31,7 +31,7 @@ public interface ASTVisitor<T> {
 
     T visit(Assign assign);
 
-    T visit(InitCall initCall);
+    T visit(ImplicitCall implicitCall);
 
     T visit(Call call);
 

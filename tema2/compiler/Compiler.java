@@ -132,9 +132,11 @@ public class Compiler {
         var ast = new ASTConstructionVisitor().visit(globalTree);
 
 //        ast.accept(new ASTPrintVisitor());
-        ast.accept(new ASTDefinitionPassVisitor());
+        var definitionPassVisitor = new ASTDefinitionPassVisitor();
+        ast.accept(definitionPassVisitor);
 
-        ast.accept(new ASTResolutionPassVisitor());
+        var resolutionPassVisitor = new ASTResolutionPassVisitor(definitionPassVisitor.getGlobalScope());
+        ast.accept(resolutionPassVisitor);
 
         if (SymbolTable.hasSemanticErrors()) {
             System.err.println("Compilation halted");

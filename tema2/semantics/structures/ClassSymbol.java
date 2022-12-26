@@ -14,8 +14,6 @@ public class ClassSymbol extends Symbol implements Scope {
     
     static {
         OBJECT = new ClassSymbol(null, "Object");
-        SELF_TYPE.setInheritedScope(OBJECT);
-
         OBJECT.add(new FunctionSymbol(OBJECT, "abort", OBJECT));
         var objectTypeNameFunction = new FunctionSymbol(OBJECT, "type_name");
         OBJECT.add(objectTypeNameFunction);

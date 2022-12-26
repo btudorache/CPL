@@ -9,6 +9,10 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     Scope currentScope = null;
     GlobalScope globalScope = null;
 
+    public GlobalScope getGlobalScope() {
+        return globalScope;
+    }
+
     @Override
     public Void visit(Id id) {
         id.scope = currentScope;
@@ -27,7 +31,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
-        var symbol = new IdSymbol(param.name.getText());
+        var symbol = new IdSymbol(param.name.getText(), param.type.getText());
         param.globalScope = globalScope;
         param.scope = (FunctionSymbol) currentScope;
         param.symbol = symbol;
@@ -83,6 +87,19 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
                 }
             }
         });
+
+//        var mainClass = globalScope.lookupType("Main");
+//        if (mainClass == null) {
+//            SymbolTable.error(program.context, program.context.start, "No method main in class Main", program);
+//            return null;
+//        }
+//
+//        var mainFunction = mainClass.lookup("main");
+//        if (!(mainFunction instanceof FunctionSymbol)) {
+//            SymbolTable.error(program.context, program.context.start, "No method main in class Main", program);
+//            return null;
+//        }
+
         return null;
     }
 
@@ -131,7 +148,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
-        var symbol = new IdSymbol(variableDefinition.name.getText());
+        var symbol = new IdSymbol(variableDefinition.name.getText(), variableDefinition.type.getText());
         variableDefinition.scope = (ClassSymbol) currentScope;
         variableDefinition.globalScope = globalScope;
         variableDefinition.symbol = symbol;
@@ -159,6 +176,7 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     public Void visit(FunctionDefinition functionDefinition) {
 
         var functionSymbol = new FunctionSymbol((ClassSymbol) currentScope, functionDefinition.name.getText());
+        functionSymbol.typeString = functionDefinition.type.getText();
         functionDefinition.scope = functionSymbol;
         functionDefinition.globalScope = globalScope;
         currentScope = functionSymbol;
@@ -182,11 +200,6 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
 
         if (functionDefinition.functionValue != null) {
             functionDefinition.functionValue.accept(this);
-        }
-
-        var definedParamType = globalScope.lookupType(functionDefinition.type.getText());
-        if (definedParamType != null) {
-            functionSymbol.type = definedParamType;
         }
 
         currentScope = currentScope.getParent();
@@ -240,12 +253,12 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
     }
 
     @Override
-    public Void visit(InitCall initCall) {
-        initCall.scope = currentScope;
-        initCall.globalScope = globalScope;
+    public Void visit(ImplicitCall implicitCall) {
+        implicitCall.scope = currentScope;
+        implicitCall.globalScope = globalScope;
 
-        if (initCall.args != null) {
-            initCall.args.forEach(arg -> arg.accept(this));
+        if (implicitCall.args != null) {
+            implicitCall.args.forEach(arg -> arg.accept(this));
         }
         return null;
     }
@@ -290,16 +303,11 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             return null;
         }
 
-        localParam.symbol = new IdSymbol(localParam.name.getText());
+        localParam.symbol = new IdSymbol(localParam.name.getText(), localParam.type.getText());
         localParam.globalScope = globalScope;
 
         if (localParam.value != null) {
             localParam.value.accept(this);
-        }
-
-        var definedParamType = globalScope.lookupType(localParam.type.getText());
-        if (definedParamType != null) {
-            localParam.symbol.type = definedParamType;
         }
 
         return null;
@@ -345,8 +353,12 @@ public class ASTDefinitionPassVisitor implements ASTVisitor<Void> {
             SymbolTable.error(caseBranch.context, caseBranch.type, String.format("Case variable %s has illegal type SELF_TYPE", caseBranch.name.getText()), caseBranch);
         }
 
+        currentScope = new DefaultScope(currentScope);
+        currentScope.add(new IdSymbol(caseBranch.name.getText(), caseBranch.type.getText()));
         caseBranch.scope = currentScope;
         caseBranch.value.accept(this);
+
+        currentScope = currentScope.getParent();
         return null;
     }
 

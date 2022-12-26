@@ -137,12 +137,12 @@ public class ASTPrintVisitor implements ASTVisitor<Void> {
     }
 
     @Override
-    public Void visit(InitCall initCall) {
+    public Void visit(ImplicitCall implicitCall) {
         printIndent("implicit dispatch");
         indent++;
-        printIndent(initCall.name.getText());
-        if (initCall.args != null) {
-            initCall.args.forEach(arg -> arg.accept(this));
+        printIndent(implicitCall.name.getText());
+        if (implicitCall.args != null) {
+            implicitCall.args.forEach(arg -> arg.accept(this));
         }
         indent--;
         return null;

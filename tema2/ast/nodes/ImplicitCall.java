@@ -8,13 +8,12 @@ import org.antlr.v4.runtime.Token;
 
 import java.util.List;
 
-public class InitCall extends Expression {
+public class ImplicitCall extends Expression {
     public Token name;
     public List<Expression> args;
-
     public GlobalScope globalScope;
     public Scope scope;
-    public InitCall(Token name, List<Expression> args, ParserRuleContext context) {
+    public ImplicitCall(Token name, List<Expression> args, ParserRuleContext context) {
         super(context);
         this.name = name;
         this.args = args;

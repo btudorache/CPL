@@ -11,16 +11,28 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
+    public GlobalScope globalScope;
+
+    public ASTResolutionPassVisitor(GlobalScope globalScope) {
+        this.globalScope = globalScope;
+    }
+
     @Override
     public ResolutionResult visit(Id id) {
         if (id.name.getText().equals("self")) {
-            return new ResolutionResult(ClassSymbol.SELF_TYPE, id.name);
+            return new ResolutionResult(ClassSymbol.SELF_TYPE, id.name, true);
         }
 
         var resolvedVariableSymbol = id.scope.lookup(id.name.getText());
         if (!(resolvedVariableSymbol instanceof IdSymbol)) {
-            SymbolTable.error(id.context, id.name, String.format("Undefined identifier %s", id.name.getText()), id);
-            return null;
+            var classScope = id.scope.lookupClass();
+            var inheritedVariableSymbol = classScope.lookupInheritanceTree(id.name.getText());
+            if (!(inheritedVariableSymbol instanceof IdSymbol)) {
+                SymbolTable.error(id.context, id.name, String.format("Undefined identifier %s", id.name.getText()), id);
+                return null;
+            }
+
+            return new ResolutionResult(((IdSymbol)inheritedVariableSymbol).type, id.name);
         }
 
         return new ResolutionResult(((IdSymbol)resolvedVariableSymbol).type, id.name);
@@ -117,6 +129,7 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                     var resolutionResult = variableDefinition.variableValue.accept(this);
                     var valueType = (resolutionResult != null) ? resolutionResult.typeSymbol : null;
                     if (valueType != null) {
+                        variableDefinition.symbol.dynamicType = valueType;
                         if (variableType.equals(ClassSymbol.SELF_TYPE)) {
                             return new ResolutionResult(valueType, variableDefinition.name);
                         }
@@ -196,6 +209,11 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                     }
                 }
 
+                var functionType = functionDefinition.globalScope.lookupType(((FunctionSymbol) overloadedMethodSymbol).typeString);
+                if (functionType != null) {
+                    ((FunctionSymbol) overloadedMethodSymbol).type = functionType;
+                }
+
                 var overloadedMethodType = ((FunctionSymbol) overloadedMethodSymbol).type.getName();
                 if (!overloadedMethodType.equals(functionDefinition.type.getText())) {
                     SymbolTable.error(functionDefinition.context,
@@ -216,9 +234,7 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
 
 
                 if (functionValueType != null) {
-                    // take care of self variable
-//                    System.out.println(functionDefinition.context.start.getLine() + " " + returnTypeDefinedSymbol.getName() + " " + functionValueType.getName());
-                    if (functionValueType.equals(ClassSymbol.SELF_TYPE) && classScope.compareType(returnTypeDefinedSymbol)) {
+                    if (functionValueType.equals(ClassSymbol.SELF_TYPE) && !returnTypeDefinedSymbol.equals(ClassSymbol.SELF_TYPE)) {
                         functionValueType = functionDefinition.scope.lookupClass();
                     }
 
@@ -356,44 +372,57 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
     }
 
     @Override
-    public ResolutionResult visit(InitCall initCall) {
-        ClassSymbol classScope = initCall.scope.lookupClass();
-        Symbol functionToken = classScope.lookup(initCall.name.getText());
-        Symbol inheritedFunctionToken = classScope.lookupInheritanceTree(initCall.name.getText());
+    public ResolutionResult visit(ImplicitCall implicitCall) {
+        ClassSymbol classScope = implicitCall.scope.lookupClass();
+
+        Symbol functionToken = classScope.lookup(implicitCall.name.getText());
+        Symbol inheritedFunctionToken = classScope.lookupInheritanceTree(implicitCall.name.getText());
         if (!(functionToken instanceof FunctionSymbol) && !(inheritedFunctionToken instanceof FunctionSymbol)) {
-            SymbolTable.error(initCall.context, initCall.name, String.format("Undefined method %s in class %s", initCall.name.getText(), classScope.getName()), initCall);
+            SymbolTable.error(implicitCall.context, implicitCall.name, String.format("Undefined method %s in class %s", implicitCall.name.getText(), classScope.getName()), implicitCall);
             return null;
         }
 
         FunctionSymbol castedFunctionToken = (!(functionToken instanceof FunctionSymbol)) ? (FunctionSymbol) inheritedFunctionToken : (FunctionSymbol) functionToken;
+        ClassSymbol functionType = implicitCall.globalScope.lookupType(castedFunctionToken.typeString);
+        if (functionType != null) {
+            castedFunctionToken.type = functionType;
+        }
+
         var returnedType = (castedFunctionToken.type.equals(ClassSymbol.SELF_TYPE)) ? classScope : castedFunctionToken.type;
-        if (castedFunctionToken.getFormals().size() != initCall.args.size()) {
-            SymbolTable.error(initCall.context, initCall.context.start, String.format("Method %s of class %s is applied to wrong number of arguments", initCall.name.getText(), classScope.getName()), initCall);
-            return new ResolutionResult(returnedType, initCall.context.start);
+        if (castedFunctionToken.getFormals().size() != implicitCall.args.size()) {
+            SymbolTable.error(implicitCall.context, implicitCall.context.start, String.format("Method %s of class %s is applied to wrong number of arguments", implicitCall.name.getText(), classScope.getName()), implicitCall);
+            return new ResolutionResult(returnedType, implicitCall.context.start);
         }
 
         var params = new LinkedList(Arrays.asList(castedFunctionToken.getFormals().values().toArray()));
         for (int i = 0; i < params.size(); i++) {
             var definedParam = (IdSymbol) params.get(i);
-            var actualParamResolution = initCall.args.get(i).accept(this);
+            var definedParamType = implicitCall.globalScope.lookupType(definedParam.typeString);
+            if (definedParamType != null) {
+                definedParam.type = definedParamType;
+            }
+
+            var actualParamResolution = implicitCall.args.get(i).accept(this);
             var actualParamType = (actualParamResolution != null) ? actualParamResolution.typeSymbol : null;
+            if (actualParamType != null && actualParamType.equals(ClassSymbol.SELF_TYPE)) {
+                actualParamType = implicitCall.scope.lookupClass();
+            }
 
             if (!definedParam.type.compareType(actualParamType)) {
-                SymbolTable.error(initCall.context,
-                        initCall.args.get(i).context.start,
+                SymbolTable.error(implicitCall.context,
+                        implicitCall.args.get(i).context.start,
                         String.format("In call to method %s of class %s, actual type %s of formal parameter %s is incompatible with declared type %s",
                                       castedFunctionToken.getName(),
                                       classScope.getName(),
                                       actualParamType.getName(),
                                       definedParam.getName(),
                                       definedParam.type.getName()),
-                        initCall);
-                return new ResolutionResult(returnedType, initCall.context.start);
+                        implicitCall);
+                return new ResolutionResult(returnedType, implicitCall.context.start);
             }
         }
 
-//        System.out.println(initCall.context.start.getLine());
-        return new ResolutionResult(returnedType, initCall.context.start);
+        return new ResolutionResult(returnedType, implicitCall.context.start);
     }
 
     @Override
@@ -402,28 +431,31 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
         var classScope = (resolutionResult != null) ? resolutionResult.typeSymbol : null;
 
         if (classScope != null) {
+            if (classScope.equals(ClassSymbol.SELF_TYPE)) {
+                classScope = call.scope.lookupClass();
+            }
+
             if (call.atType == null) {
                 Symbol functionToken = classScope.lookup(call.name.getText());
                 Symbol inheritedFunctionToken = classScope.lookupInheritanceTree(call.name.getText());
-                if ((!(functionToken instanceof FunctionSymbol) && !(inheritedFunctionToken instanceof FunctionSymbol) && classScope.equals(ClassSymbol.SELF_TYPE)) ) {
-                    classScope = call.scope.lookupClass();
-                    functionToken = classScope.lookup(call.name.getText());
-                    inheritedFunctionToken = classScope.lookupInheritanceTree(call.name.getText());
 
-                    if (!(functionToken instanceof FunctionSymbol) && !(inheritedFunctionToken instanceof FunctionSymbol)) {
-                        SymbolTable.error(call.context, call.name, String.format("Undefined method %s in class %s", call.name.getText(), classScope.getName()), call);
-                        return null;
-                    }
-                } else {
-                    if (!(functionToken instanceof FunctionSymbol) && !(inheritedFunctionToken instanceof FunctionSymbol)) {
-                        SymbolTable.error(call.context, call.name, String.format("Undefined method %s in class %s", call.name.getText(), classScope.getName()), call);
-                        return null;
-                    }
+                if (!(functionToken instanceof FunctionSymbol) && !(inheritedFunctionToken instanceof FunctionSymbol)) {
+                    SymbolTable.error(call.context, call.name, String.format("Undefined method %s in class %s", call.name.getText(), classScope.getName()), call);
+                    return null;
                 }
 
+
                 FunctionSymbol castedFunctionToken = (!(functionToken instanceof FunctionSymbol)) ? (FunctionSymbol) inheritedFunctionToken : (FunctionSymbol) functionToken;
+                ClassSymbol functionType = call.globalScope.lookupType(castedFunctionToken.typeString);
+                if (functionType != null) {
+                    castedFunctionToken.type = functionType;
+                }
+
                 var returnedType = (castedFunctionToken.type.equals(ClassSymbol.SELF_TYPE)) ? classScope : castedFunctionToken.type;
-//                if ()
+                if (resolutionResult.selfDispatch) {
+                    returnedType = ClassSymbol.SELF_TYPE;
+                }
+
                 if (castedFunctionToken.getFormals().size() != call.args.size()) {
                     SymbolTable.error(call.context, call.name, String.format("Method %s of class %s is applied to wrong number of arguments", call.name.getText(), classScope.getName()), call);
                     return new ResolutionResult(returnedType, call.context.start);
@@ -432,8 +464,16 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                 var params = new LinkedList(Arrays.asList(castedFunctionToken.getFormals().values().toArray()));
                 for (int i = 0; i < params.size(); i++) {
                     var definedParam = (IdSymbol) params.get(i);
+                    var definedParamType = call.globalScope.lookupType(definedParam.typeString);
+                    if (definedParamType != null) {
+                        definedParam.type = definedParamType;
+                    }
+
                     var actualParamResolution = call.args.get(i).accept(this);
                     var actualParamType = (actualParamResolution != null) ? actualParamResolution.typeSymbol : null;
+                    if (actualParamType != null && actualParamType.equals(ClassSymbol.SELF_TYPE)) {
+                        actualParamType = call.scope.lookupClass();
+                    }
 
                     if (!definedParam.type.compareType(actualParamType)) {
                         SymbolTable.error(call.context,
@@ -445,11 +485,11 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                                         definedParam.getName(),
                                         definedParam.type.getName()),
                                 call);
-                        return new ResolutionResult(returnedType, call.context.start);
+                        return new ResolutionResult(returnedType, call.context.start, resolutionResult.selfDispatch);
                     }
                 }
 
-                return new ResolutionResult(returnedType, call.context.start);
+                return new ResolutionResult(returnedType, call.context.start, resolutionResult.selfDispatch);
             } else {
                 if (call.atType.getText().equals(ClassSymbol.SELF_TYPE.getName())) {
                     SymbolTable.error(call.context, call.atType, "Type of static dispatch cannot be SELF_TYPE", call);
@@ -462,7 +502,8 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                     return null;
                 }
 
-                if (!staticType.compareType(classScope)) {
+                var comparedType = classScope.equals(ClassSymbol.SELF_TYPE) ? call.scope.lookupClass() : classScope;
+                if (!staticType.compareType(comparedType)) {
                     SymbolTable.error(call.context, call.atType, String.format("Type %s of static dispatch is not a superclass of type %s", call.atType.getText(), classScope.getName()), call);
                     return null;
                 }
@@ -475,17 +516,35 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                 }
 
                 FunctionSymbol castedFunctionToken = (!(functionToken instanceof FunctionSymbol)) ? (FunctionSymbol) inheritedFunctionToken : (FunctionSymbol) functionToken;
+                ClassSymbol functionType = call.globalScope.lookupType(castedFunctionToken.typeString);
+                if (functionType != null) {
+                    castedFunctionToken.type = functionType;
+                }
+
                 var returnedType = (castedFunctionToken.type.equals(ClassSymbol.SELF_TYPE)) ? classScope : castedFunctionToken.type;
+                if (resolutionResult.selfDispatch) {
+                    returnedType = ClassSymbol.SELF_TYPE;
+                }
+
+
                 if (castedFunctionToken.getFormals().size() != call.args.size()) {
                     SymbolTable.error(call.context, call.atType, String.format("Method %s of class %s is applied to wrong number of arguments", call.name.getText(), staticType.getName()), call);
-                    return new ResolutionResult(returnedType, call.context.start);
+                    return new ResolutionResult(returnedType, call.context.start, resolutionResult.selfDispatch);
                 }
 
                 var params = new LinkedList(Arrays.asList(castedFunctionToken.getFormals().values().toArray()));
                 for (int i = 0; i < params.size(); i++) {
                     var definedParam = (IdSymbol) params.get(i);
+                    var definedParamType = call.globalScope.lookupType(definedParam.typeString);
+                    if (definedParamType != null) {
+                        definedParam.type = definedParamType;
+                    }
+
                     var actualParamResolution = call.args.get(i).accept(this);
                     var actualParamType = (actualParamResolution != null) ? actualParamResolution.typeSymbol : null;
+                    if (actualParamType != null && actualParamType.equals(ClassSymbol.SELF_TYPE)) {
+                        actualParamType = call.scope.lookupClass();
+                    }
 
                     if (!definedParam.type.compareType(actualParamType)) {
                         SymbolTable.error(call.context,
@@ -497,11 +556,11 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                                         definedParam.getName(),
                                         definedParam.type.getName()),
                                 call);
-                        return new ResolutionResult(returnedType, call.context.start);
+                        return new ResolutionResult(returnedType, call.context.start, resolutionResult.selfDispatch);
                     }
                 }
 
-                return new ResolutionResult(returnedType, call.context.start);
+                return new ResolutionResult(returnedType, call.context.start, resolutionResult.selfDispatch);
             }
         }
 
@@ -567,6 +626,7 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                 );
                 return null;
             }
+            localParam.symbol.type = definedType;
 
             if (localParam.value != null) {
                 var resolutionResult = localParam.value.accept(this);
@@ -587,6 +647,7 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                 }
 
                 localParam.symbol.type = definedType;
+                localParam.symbol.dynamicType = valueType;
                 return new ResolutionResult(valueType, localParam.name);
             }
         }
@@ -614,6 +675,9 @@ public class ASTResolutionPassVisitor implements ASTVisitor<ResolutionResult> {
                 SymbolTable.error(caseBranch.context, caseBranch.type, String.format("Case variable %s has undefined type %s", caseBranch.name.getText(), caseBranch.type.getText()), caseBranch);
                 return null;
             }
+
+            var idSymbol = (IdSymbol) caseBranch.scope.lookup(caseBranch.name.getText());
+            idSymbol.type = (ClassSymbol) definedCaseType;
 
             var exprResolution = caseBranch.value.accept(this);
             var exprType = (exprResolution != null) ? exprResolution.typeSymbol : null;

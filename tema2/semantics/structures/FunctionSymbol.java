@@ -1,5 +1,7 @@
 package cool.semantics.structures;
 
+import org.antlr.v4.runtime.Token;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -8,6 +10,9 @@ public class FunctionSymbol extends IdSymbol implements Scope {
 
     protected ClassSymbol parent;
 
+    // used if the function type is not already bound
+    public String typeString;
+
     public FunctionSymbol(ClassSymbol parent, String name) {
         super(name);
         this.parent = parent;
@@ -15,6 +20,7 @@ public class FunctionSymbol extends IdSymbol implements Scope {
 
     public FunctionSymbol(ClassSymbol parent, String name, ClassSymbol classSymbol) {
         super(name, classSymbol);
+        this.typeString = classSymbol.name;
         this.parent = parent;
     }
 

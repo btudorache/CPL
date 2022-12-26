@@ -82,7 +82,7 @@ public class ASTConstructionVisitor extends CoolParserBaseVisitor<ASTNode> {
         var args = (ctx.args != null) ?
                                   ctx.args.stream().map(arg -> (Expression) visit(arg)).collect(Collectors.toList()) :
                                   null;
-        return new InitCall(ctx.ID().getSymbol(), args, ctx);
+        return new ImplicitCall(ctx.ID().getSymbol(), args, ctx);
     }
 
     @Override
