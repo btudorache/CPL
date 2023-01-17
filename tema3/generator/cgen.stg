@@ -1,0 +1,384 @@
+sequence(e) ::= "<e; separator=\"\n\">"
+sequenceSpaced(e) ::= "<e; separator=\"\n\n\">"
+
+program(strings, ints, classNames, classInitAndDispatch, classPrototypes, classDispatchTables, funcs) ::= <<
+    .data
+    .align  2
+    .globl  class_nameTab
+    .globl  Int_protObj
+    .globl  String_protObj
+    .globl  bool_const0
+    .globl  bool_const1
+    .globl  Main_protObj
+    .globl  _int_tag
+    .globl  _string_tag
+    .globl  _bool_tag
+_int_tag:
+    .word   1
+_string_tag:
+    .word   2
+_bool_tag:
+    .word   3
+
+str_const0:
+    .word   2
+    .word   5
+    .word   String_dispTab
+    .word   int_const0
+    .asciiz ""
+    .align  2
+<strings>
+int_const0:
+    .word   1
+    .word   4
+    .word   Int_dispTab
+    .word   0
+
+<ints>
+bool_const0:
+    .word   3
+    .word   4
+    .word   Bool_dispTab
+    .word   0
+bool_const1:
+    .word   3
+    .word   4
+    .word   Bool_dispTab
+    .word   1
+class_nameTab:
+<classNames>
+class_objTab:
+<classInitAndDispatch>
+
+<classPrototypes>
+
+<classDispatchTables>
+    .globl  heap_start
+heap_start:
+    .word   0
+    .text
+    .globl  Int_init
+    .globl  String_init
+    .globl  Bool_init
+    .globl  Main_init
+    .globl  Main.main
+Object_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+IO_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    jal     Object_init
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+Int_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    jal     Object_init
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+String_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    jal     Object_init
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+Bool_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    jal     Object_init
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+<funcs>
+>>
+
+word(value) ::= <<
+    .word   <value>
+>>
+
+string(labelCount, size, sizeLabel, value) ::= <<
+str_const<labelCount>:
+    .word   2
+    .word   <size>
+    .word   String_dispTab
+    .word   int_const<sizeLabel>
+    .asciiz "<value>"
+    .align  2
+>>
+
+int(labelCount, value) ::= <<
+int_const<labelCount>:
+    .word   1
+    .word   4
+    .word   Int_dispTab
+    .word   <value>
+>>
+
+classPrototype(className, classLabel, variables, size) ::= <<
+<className>_protObj:
+    .word   <classLabel>
+    .word   <size>
+    .word   <className>_dispTab
+<sequence(variables)>
+>>
+
+classDispatchTable(className, methods) ::= <<
+<className>_dispTab:
+<sequence(methods)>
+>>
+
+classInit(className, inheritedClass, body) ::= <<
+<className>_init:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+    jal     <inheritedClass>_init
+<sequence(body)>
+    move    $a0 $s0
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+    jr      $ra
+>>
+
+variableInit(initResult, variableOffset, variableTypeRegister) ::= <<
+<initResult>
+    sw      $a0 <variableOffset>(<variableTypeRegister>)
+>>
+
+funcDef(name, body, numParams) ::= <<
+<name>:
+    addiu   $sp $sp -12
+    sw      $fp 12($sp)
+    sw      $s0 8($sp)
+    sw      $ra 4($sp)
+    addiu   $fp $sp 4
+    move    $s0 $a0
+<body>
+    lw      $fp 12($sp)
+    lw      $s0 8($sp)
+    lw      $ra 4($sp)
+    addiu   $sp $sp 12
+<if(numParams)>    addiu   $sp $sp <numParams><else><endif>
+    jr      $ra
+>>
+
+literal(label) ::= <<
+    la      $a0 <label>
+>>
+
+dispatch(dispatcherCode, args, dispatchLabel, fileLine, fileNameLabel, methodOffset, implicitDispatch, staticDispatch) ::= <<
+<sequence(args)>
+<if(implicitDispatch)>    move    $a0 $s0<else><dispatcherCode><endif>
+    bnez    $a0 dispatch<dispatchLabel>
+    la      $a0 str_const<fileNameLabel>
+    li      $t1 <fileLine>
+    jal     _dispatch_abort
+dispatch<dispatchLabel>:
+<if(staticDispatch)>    la      $t1 <staticDispatch><else>    lw      $t1 8($a0)<endif>
+    lw      $t1 <methodOffset>($t1)
+    jalr    $t1
+>>
+
+dispatchArg(expr) ::= <<
+<expr>
+    sw      $a0 0($sp)
+    addiu   $sp $sp -4
+>>
+
+let(body, args, numArgsSize) ::= <<
+    addiu   $sp $sp -<numArgsSize>
+<sequence(args)>
+<body>
+    addiu   $sp $sp <numArgsSize>
+>>
+
+letParam(assignmentBody, offset, intParam) ::= <<
+<assignmentBody>
+    sw      $a0 <offset>($fp)
+>>
+
+newObjectStatic(className) ::= <<
+    la      $a0 <className>_protObj
+    jal     Object.copy
+    jal     <className>_init
+>>
+
+newObjectSelfType(classLabel) ::= <<
+    la      $t1 class_objTab    # self type dynamic init
+    lw      $t2 0($s0)          # class tag
+    sll     $t2 $t2 3           # *8
+    addu    $t1 $t1 $t2         # class_objTab + 8 * tag
+    sw      $t1 0($sp)
+    addiu   $sp $sp -4
+    lw      $a0 0($t1)          # _protObj
+    jal     Object.copy
+    lw      $t1 4($sp)
+    addiu   $sp $sp 4
+    lw      $t1 4($t1)          # _init
+    jalr    $t1
+>>
+
+ifExpr(condBranch, firstBranch, secondBranch, ifCount) ::= <<
+<condBranch>
+    lw      $t1 12($a0)
+	beq     $t1 1 true_branch_<ifCount>
+false_branch_<ifCount>:
+<secondBranch>
+    j       end_if_<ifCount>
+true_branch_<ifCount>:
+<firstBranch>
+end_if_<ifCount>:
+>>
+
+isVoid(body, voidLabel) ::= <<
+<body>
+    move    $t1 $a0
+    la      $a0 bool_const1
+    beqz    $t1 isvoid<voidLabel>
+    la      $a0 bool_const0
+isvoid<voidLabel>:
+>>
+
+not(body, notLabel) ::= <<
+<body>
+    lw      $t1 12($a0)
+    la      $a0 bool_const1
+    beqz    $t1 not<notLabel>
+    la      $a0 bool_const0
+not<notLabel>:
+>>
+
+binaryArithmeticOperator(expr1, expr2, op) ::= <<
+<expr1>
+	sw      $a0 0($sp)
+	addiu   $sp $sp -4
+<expr2>
+    jal     Object.copy
+	lw      $t1 4($sp)
+	addiu   $sp $sp 4
+	lw      $t1 12($t1)
+    lw      $t2 12($a0)
+	<op>    $t1 $t1 $t2
+	sw      $t1 12($a0)
+>>
+
+complement(expr) ::= <<
+<expr>
+    jal     Object.copy
+    lw      $t1 12($a0)
+    neg     $t1 $t1
+    sw      $t1 12($a0)
+>>
+
+equality(expr1, expr2, label) ::= <<
+<expr1>
+    sw      $a0 0($sp)
+    addiu   $sp $sp -4
+<expr2>
+    lw      $t1 4($sp)
+    addiu   $sp $sp 4
+    move    $t2 $a0
+    la      $a0 bool_const1
+    beq     $t1 $t2 eq<label>
+    la      $a1 bool_const0
+    jal     equality_test
+eq<label>:
+>>
+
+compare(expr1, expr2, op, label) ::= <<
+<expr1>
+    sw      $a0 0($sp)
+    addiu   $sp $sp -4
+<expr2>
+    lw      $t1 4($sp)
+    addiu   $sp $sp 4
+    lw      $t1 12($t1)
+    lw      $t2 12($a0)
+    la      $a0 bool_const1
+    <op>    $t1 $t2 compare<label>
+    la      $a0 bool_const0
+compare<label>:
+>>
+
+while(cond, body, label) ::= <<
+while<label>:
+<cond>
+    lw      $t1 12($a0)
+    beqz    $t1 endwhile<label>
+<body>
+    b       while<label>
+endwhile<label>:
+    move    $a0 $zero
+>>
+
+caseBranch(expr, caseBranchLabel, caseLabel, lowerBound, upperBound) ::= <<
+    blt     $t1 <lowerBound> casebranch<caseBranchLabel>
+    bgt     $t1 <upperBound> casebranch<caseBranchLabel>
+<expr>
+    b       endcase<caseLabel>
+casebranch<caseBranchLabel>:
+>>
+
+case(expr, branches, label, fileNameLabel, fileLine) ::= <<
+    addiu   $sp $sp -4
+<expr>
+    bnez    $a0 case<label>
+    la      $a0 str_const<fileNameLabel>
+    li      $t1 <fileLine>
+    jal     _case_abort2
+case<label>:
+    sw      $a0 -4($fp)
+    lw      $t1 0($a0)
+<sequence(branches)>
+    lw      $a0 -4($fp)
+    jal     _case_abort
+endcase<label>:
+    addiu   $sp $sp 4
+>>
