@@ -6,4 +6,4 @@ Temele constau in implementarea graduala a unui **compilator** pentru limbajul *
 * Tema 2 - Analiza semantica (Java)
 * Tema 3 - Generare de cod (StringTemplate + Java)
 
-Codul generat poate fi testat in simulatorul de cod MIPS **QtSpim** (este nevoie de asemenea si de runtime-ul limbajului COOL, care este un singur fisier).
+Codul generat poate fi testat in simulatorul de cod MIPS **QtSpim** (este nevoie de asemenea si de runtime-ul limbajului COOL).
